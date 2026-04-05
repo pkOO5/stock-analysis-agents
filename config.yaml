@@ -16,9 +16,10 @@ model: random_forest
 crisis_downweight: 0.3
 
 # --- Multi-agent pipeline (run_pipeline.py) ---
-# Uses Ollama local LLM (no API key). Start Ollama first: open -a Ollama
+# Auto-detects backend: Ollama (local) → Anthropic (cloud) → dry-run
 pipeline:
-  model: llama3.1:8b
+  ollama_model: llama3.1:8b
+  anthropic_model: claude-sonnet-4-20250514
   max_tickers: 15
   max_positions: 5
   timeout_minutes: 15

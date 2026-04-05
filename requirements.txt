@@ -9,3 +9,4 @@ pytest
 langgraph
 langchain-core
 edgartools
+anthropic
