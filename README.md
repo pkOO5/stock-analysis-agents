@@ -76,6 +76,8 @@ stock-analysis-agents/
 ├── market_fetcher.py         # OHLCV data (Polygon → Finnhub → yfinance)
 ├── feature_engineering.py    # RSI, MACD, Bollinger, candlestick patterns
 ├── constants.py              # Feature columns, model factory
+├── backtest.py               # Walk-forward ML backtest
+├── paper_trader.py           # Paper trade logger + outcome reviewer
 ├── config.yaml               # Pipeline and model configuration
 ├── run_pipeline.sh           # Shell wrapper with auto-start and timeout
 └── requirements.txt
@@ -89,6 +91,37 @@ Edit `config.yaml` to adjust:
 - `pipeline.max_tickers` — how many tickers to analyze (default: 15)
 - `pipeline.max_positions` — max actionable BUY/SELL calls (default: 5)
 - `pipeline.timeout_minutes` — hard time limit (default: 15)
+
+## Backtesting
+
+Validate the ML model's edge before trusting the pipeline's decisions:
+
+```bash
+# Backtest all tickers in config.yaml (walk-forward, 252-day training window)
+python backtest.py
+
+# Specific tickers
+python backtest.py --tickers AAPL NVDA TSLA
+
+# Override model
+python backtest.py --model xgboost --threshold 0.55
+```
+
+Outputs per-ticker win rate, total return, avg return per trade, best/worst trades.
+
+## Paper Trading
+
+Every pipeline run automatically logs actionable decisions (with entry prices) to `data/paper_trades.jsonl`. Review outcomes after 1, 5, or 10 trading days:
+
+```bash
+# Check how past picks performed
+python paper_trader.py review
+
+# Check only 5-day outcomes
+python paper_trader.py review --days 5
+```
+
+This builds a real track record over time — no backtesting bias, just forward results.
 
 ## Performance
 

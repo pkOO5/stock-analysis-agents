@@ -12,7 +12,8 @@ data/pipeline_report_*.md
 data/pipeline.log
 data/agents/
 data/*.pkl
-data/*.jsonl
 data/*.json
 data/*.log
 data/*.txt
+# Paper trades log is tracked (useful to review history)
+# data/paper_trades.jsonl

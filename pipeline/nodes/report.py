@@ -84,4 +84,12 @@ def run_report(state: dict[str, Any]) -> dict[str, Any]:
         f.write(report_md)
 
     print(f"  [report] written to {report_path}")
+
+    # Auto-record decisions for paper trading
+    try:
+        from paper_trader import record_decisions
+        record_decisions(decisions, options_recs, snapshot)
+    except Exception as e:
+        print(f"  [report] paper_trader record failed: {e}")
+
     return {"final_report": report_md}
