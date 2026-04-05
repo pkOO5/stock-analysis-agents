@@ -1,0 +1,24 @@
+# Stock analysis pipeline config
+
+# Default tickers (fallback if screener can't reach market data)
+tickers:
+  - XOM
+  - BA
+  - NVDA
+  - AAPL
+  - SPY
+
+# Data lookback for training (3 years)
+lookback_days: 1095
+
+# Model: random_forest or xgboost
+model: random_forest
+crisis_downweight: 0.3
+
+# --- Multi-agent pipeline (run_pipeline.py) ---
+# Uses Ollama local LLM (no API key). Start Ollama first: open -a Ollama
+pipeline:
+  model: llama3.1:8b
+  max_tickers: 15
+  max_positions: 5
+  timeout_minutes: 15

@@ -1,0 +1,10 @@
+pandas
+python-dotenv
+yfinance
+numpy
+scikit-learn
+xgboost
+pyyaml
+pytest
+langgraph
+langchain-core
