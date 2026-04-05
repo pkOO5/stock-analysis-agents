@@ -78,8 +78,9 @@ DECISION_SYSTEM = (
 DECISION_PROMPT = """\
 Market regime: VIX={vix:.1f} ({vix_regime})
 
-For each ticker below, you have a technical analysis and a pattern analysis. \
-Make a final BUY / SELL / HOLD decision with confidence.
+For each ticker below, you have a technical analysis, a pattern analysis, \
+and a smart money / institutional signal. Make a final BUY / SELL / HOLD \
+decision with confidence.
 
 {analyses}
 
@@ -87,6 +88,8 @@ Rules:
 - Max {max_positions} actionable (BUY or SELL) positions total.
 - If VIX > 30, be conservative (fewer BUYs).
 - Only recommend SELL if both technical and pattern agree on bearish.
+- Boost confidence when smart money aligns (insiders buying + bullish technical).
+- Reduce confidence when smart money disagrees (insiders selling into a BUY signal).
 - Minimum confidence threshold: 0.55.
 
 Return JSON: {{"decisions": [{{"ticker": "...", "action": "BUY|SELL|HOLD", \
@@ -123,6 +126,37 @@ Recommend:
 Return JSON: {{"ticker": "{ticker}", "vehicle": "stock|options", \
 "strategy": "...", "strike": <float|null>, "expiry": "{expiry}", \
 "risk_reward": "...", "reasoning": "..."}}
+"""
+
+INSTITUTIONAL_SYSTEM = (
+    "You are a smart-money analyst. You interpret institutional holdings, "
+    "insider transactions, and 13F data to gauge what the big players are doing. "
+    "Be specific about whether insiders are buying or selling."
+)
+
+INSTITUTIONAL_PROMPT = """\
+Ticker: {ticker}
+
+## Top Institutional Holders
+{institutional_holders}
+
+## Major Holder Breakdown
+{major_holders}
+
+## Recent Insider Transactions (last 6 months)
+{insider_transactions}
+
+Analyze:
+1. Are insiders net buying or selling? How significant?
+2. Is institutional ownership increasing or stable?
+3. What does this suggest about smart money sentiment?
+
+Return JSON: {{"ticker": "{ticker}", \
+"smart_money_signal": "bullish|bearish|neutral", \
+"insider_sentiment": "buying|selling|mixed|neutral", \
+"institutional_trend": "increasing|decreasing|stable|unknown", \
+"key_insiders": "brief note on notable transactions", \
+"reasoning": "1-2 sentence summary"}}
 """
 
 REPORT_SYSTEM = (

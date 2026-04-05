@@ -5,14 +5,16 @@ A multi-agent stock analysis pipeline that screens the market, analyzes technica
 ## Architecture
 
 ```
-Step 1: SCREENER        → Scans ~50 tickers, LLM picks 10-15 for deep analysis
-Step 2: DATA COLLECTOR  → Fetches 3 years of OHLCV data + computes 30 technical features
-Step 3: ANALYSIS        → Two agents per ticker (parallel):
-         ├─ Technical Agent  (ML model + LLM reasoning)
-         └─ Pattern Agent    (candlestick analysis + LLM reasoning)
-Step 4: DECISION        → LLM synthesizes all signals into BUY / SELL / HOLD
-Step 5: OPTIONS         → Fetches live options chains, LLM recommends strategy
-Step 6: REPORT          → Generates executive markdown brief
+Step 1:   SCREENER          → Scans ~50 tickers, LLM picks 10-15 for deep analysis
+Step 2:   DATA COLLECTOR    → Fetches 3 years of OHLCV data + computes 30 technical features
+Step 2.5: INSTITUTIONAL     → Checks what big players are doing (insider buys/sells,
+           TRACKER            top fund holdings, institutional ownership trends)
+Step 3:   ANALYSIS          → Two agents per ticker:
+           ├─ Technical Agent  (ML model + LLM reasoning)
+           └─ Pattern Agent    (candlestick analysis + LLM reasoning)
+Step 4:   DECISION          → LLM weighs technicals + patterns + smart money → BUY/SELL/HOLD
+Step 5:   OPTIONS           → Fetches live options chains, LLM recommends strategy
+Step 6:   REPORT            → Generates executive markdown brief + logs paper trades
 ```
 
 **Stack:** LangGraph (orchestration) · Ollama + llama3.1:8b (local LLM) · scikit-learn / XGBoost (ML) · yfinance (market data + options chains)
@@ -96,6 +98,7 @@ stock-analysis-agents/
 │   ├── nodes/
 │   │   ├── screener.py       # Step 1: market scan + LLM selection
 │   │   ├── data_collector.py # Step 2: parallel data fetch + features
+│   │   ├── institutional.py  # Step 2.5: smart money / insider tracking
 │   │   ├── technical.py      # Step 3a: ML + LLM technical analysis
 │   │   ├── pattern.py        # Step 3b: candlestick + LLM pattern analysis
 │   │   ├── decision.py       # Step 4: BUY/SELL/HOLD decisions
@@ -124,6 +127,26 @@ Edit `config.yaml` to adjust:
 - `pipeline.max_tickers` — how many tickers to analyze (default: 15)
 - `pipeline.max_positions` — max actionable BUY/SELL calls (default: 5)
 - `pipeline.timeout_minutes` — hard time limit (default: 15)
+
+## Similar Projects & Inspiration
+
+| Project | What it does | Key idea we can learn from |
+|---------|-------------|---------------------------|
+| [OpenTrade.ai](https://github.com/satinath-nit/OpenTrade.ai) | 8 agents (incl. Bull/Bear debate) via LangGraph + Ollama | Bull vs Bear researcher agents that **argue** before the decision |
+| [AlphaLoop](https://github.com/Mithil-hub/AlphaLoop-Self-Improving-Multi-Agent-Trading-System-with-RL-Feedback) | RL reward loop that **fine-tunes** agents from trade outcomes | Self-improvement: feed paper trade results back into the model |
+| [FinanceAgent-LangGraph](https://github.com/aakarsh31/FinanceAgent-LangGraph) | 5 agents + analyst consensus comparison | Comparing our signals against Wall Street analyst ratings |
+| [PrimoAgent](https://github.com/ivebotunac/PrimoAgent) | Sequential pipeline with NLP news features | 7 quantified NLP features for news sentiment |
+
+## Tips from Reliable Sources
+
+Based on research from [Quantum Algo](https://www.quantum-algo.com/blog/algorithmic-trading-beginners-guide-2026/), [SetupAlpha](https://setupalpha.com/blogs/articles/how-to-start-algorithmic-trading-2026-guide), and [TradeTheDay](https://tradetheday.com/guides/algorithmic-trading):
+
+1. **Paper trade first** — Our pipeline does this automatically. Review results with `python paper_trader.py review` before risking real money.
+2. **Avoid overfitting** — The backtest uses walk-forward validation (no future data leakage). If win rate looks too good, it's probably overfit.
+3. **Position sizing matters more than signals** — A 55% win rate can lose money with bad sizing. Start small.
+4. **Smart money alignment** — Our institutional tracker checks if insiders and big funds agree with the ML signal. Trades where insiders are buying into a BUY signal have historically higher conviction.
+5. **VIX regime awareness** — The decision agent already adjusts for high VIX (be conservative when fear is elevated).
+6. **Never trust a single indicator** — That's why we have 7 agents, not 1.
 
 ## Backtesting
 

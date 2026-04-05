@@ -13,13 +13,14 @@ from pipeline.prompts.templates import DECISION_PROMPT, DECISION_SYSTEM
 from pipeline.utils import ask_llm_json, load_config, timed
 
 
-def _format_analyses(technical: dict, patterns: dict) -> str:
+def _format_analyses(technical: dict, patterns: dict, institutional: dict) -> str:
     """Build a per-ticker summary block for the decision prompt."""
     tickers = set(list(technical.keys()) + list(patterns.keys()))
     blocks = []
     for t in sorted(tickers):
         tech = technical.get(t, {})
         pat = patterns.get(t, {})
+        inst = institutional.get(t, {})
         block = (
             f"### {t}\n"
             f"Technical: signal={tech.get('signal', 'N/A')}, "
@@ -29,7 +30,11 @@ def _format_analyses(technical: dict, patterns: dict) -> str:
             f"Pattern: trend={pat.get('trend', 'N/A')}, "
             f"patterns={pat.get('patterns', [])}, confidence={pat.get('confidence', 'N/A')}\n"
             f"  Reasoning: {pat.get('reasoning', 'N/A')}\n"
-            f"  Support={pat.get('support', 'N/A')}, Resistance={pat.get('resistance', 'N/A')}"
+            f"  Support={pat.get('support', 'N/A')}, Resistance={pat.get('resistance', 'N/A')}\n"
+            f"Smart Money: signal={inst.get('smart_money_signal', 'N/A')}, "
+            f"insider={inst.get('insider_sentiment', 'N/A')}, "
+            f"institutional_trend={inst.get('institutional_trend', 'N/A')}\n"
+            f"  {inst.get('reasoning', 'N/A')}"
         )
         blocks.append(block)
     return "\n\n".join(blocks)
@@ -46,8 +51,9 @@ def run_decision(state: dict[str, Any]) -> dict[str, Any]:
 
     technical = state.get("technical_signals", {})
     patterns = state.get("pattern_analyses", {})
+    institutional = state.get("institutional_signals", {})
 
-    analyses_str = _format_analyses(technical, patterns)
+    analyses_str = _format_analyses(technical, patterns, institutional)
     prompt = DECISION_PROMPT.format(
         vix=vix,
         vix_regime=vix_regime,

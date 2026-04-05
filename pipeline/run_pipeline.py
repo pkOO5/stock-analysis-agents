@@ -38,6 +38,7 @@ def main():
         "tickers": [],
         "market_snapshot": {},
         "ticker_data": {},
+        "institutional_signals": {},
         "technical_signals": {},
         "pattern_analyses": {},
         "decisions": [],

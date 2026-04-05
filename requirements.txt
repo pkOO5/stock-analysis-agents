@@ -8,3 +8,4 @@ pyyaml
 pytest
 langgraph
 langchain-core
+edgartools

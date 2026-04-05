@@ -21,6 +21,9 @@ class PipelineState(TypedDict, total=False):
     # Step 2 outputs — ticker -> serialised feature DataFrame rows
     ticker_data: Annotated[dict[str, Any], _merge_dicts]
 
+    # Step 2.5 outputs — institutional / smart money
+    institutional_signals: Annotated[dict[str, Any], _merge_dicts]
+
     # Step 3 outputs
     technical_signals: Annotated[dict[str, Any], _merge_dicts]
     pattern_analyses: Annotated[dict[str, Any], _merge_dicts]
