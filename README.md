@@ -54,6 +54,36 @@ python -m pipeline.run_pipeline
 
 The report is written to `data/pipeline_report_YYYY-MM-DD.md`.
 
+### Scheduled runs (auto-pilot)
+
+Run the pipeline every N minutes during market hours, Mon-Fri:
+
+```bash
+# Run every 60 minutes during 8:30 AM - 3:00 PM (your local time)
+python scheduler.py --interval 60
+
+# Every 30 minutes
+python scheduler.py --interval 30
+
+# Every 10 minutes (aggressive — each run takes ~6 min)
+python scheduler.py --interval 10
+
+# Custom window
+python scheduler.py --interval 30 --start 09:00 --end 14:00
+
+# Single run, then exit
+python scheduler.py --once
+```
+
+To auto-start every weekday morning via macOS launchd:
+
+```bash
+./setup_schedule.sh            # install (Mon-Fri at 8:25 AM, hourly until 3 PM)
+./setup_schedule.sh uninstall  # remove
+```
+
+Ctrl+C stops the scheduler gracefully after the current run finishes.
+
 ## Project Structure
 
 ```
@@ -77,7 +107,10 @@ stock-analysis-agents/
 ├── feature_engineering.py    # RSI, MACD, Bollinger, candlestick patterns
 ├── constants.py              # Feature columns, model factory
 ├── backtest.py               # Walk-forward ML backtest
+├── simulate_portfolio.py     # Dollar-amount portfolio simulation
 ├── paper_trader.py           # Paper trade logger + outcome reviewer
+├── scheduler.py              # Recurring runs during market hours
+├── setup_schedule.sh         # macOS launchd auto-start installer
 ├── config.yaml               # Pipeline and model configuration
 ├── run_pipeline.sh           # Shell wrapper with auto-start and timeout
 └── requirements.txt
