@@ -53,7 +53,7 @@ def analyze_patterns(ticker: str, ticker_data: dict) -> dict[str, Any]:
     }
 
     try:
-        result = ask_llm_json(prompt, system=PATTERN_SYSTEM, dry_run_response=fallback)
+        result = ask_llm_json(prompt, system=PATTERN_SYSTEM, tier="fast", dry_run_response=fallback)
     except Exception as e:
         result = {
             "ticker": ticker,

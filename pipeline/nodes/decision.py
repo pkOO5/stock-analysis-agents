@@ -82,7 +82,7 @@ def run_decision(state: dict[str, Any]) -> dict[str, Any]:
 
     try:
         result = ask_llm_json(
-            prompt, system=DECISION_SYSTEM,
+            prompt, system=DECISION_SYSTEM, tier="fast",
             dry_run_response={"decisions": fallback_decisions},
         )
         decisions = result.get("decisions", [])

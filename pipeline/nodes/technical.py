@@ -101,7 +101,7 @@ def analyze_one_ticker(ticker: str, ticker_data: dict, cfg: dict) -> dict[str, A
     }
 
     try:
-        result = ask_llm_json(prompt, system=TECHNICAL_SYSTEM, dry_run_response=fallback)
+        result = ask_llm_json(prompt, system=TECHNICAL_SYSTEM, tier="fast", dry_run_response=fallback)
     except Exception as e:
         result = {
             "ticker": ticker,

@@ -72,7 +72,7 @@ def run_report(state: dict[str, Any]) -> dict[str, Any]:
     )
 
     report_md = ask_llm(
-        prompt, system=REPORT_SYSTEM,
+        prompt, system=REPORT_SYSTEM, tier="fast",
         dry_run_response=dry_run_report,
     )
 

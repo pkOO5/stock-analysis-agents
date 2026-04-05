@@ -100,7 +100,7 @@ def _analyze_options(ticker: str, action: str, confidence: float, chain: dict) -
     }
 
     try:
-        return ask_llm_json(prompt, system=OPTIONS_SYSTEM, dry_run_response=fallback)
+        return ask_llm_json(prompt, system=OPTIONS_SYSTEM, tier="fast", dry_run_response=fallback)
     except Exception as e:
         return {
             "ticker": ticker, "vehicle": "stock",

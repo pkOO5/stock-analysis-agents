@@ -1,5 +1,11 @@
-"""Shared helpers: LLM wrapper (Ollama local → Anthropic cloud fallback),
-timing decorator, config loader."""
+"""Shared helpers: hybrid LLM routing (Ollama local + Anthropic for heavy steps),
+timing decorator, config loader.
+
+Routing strategy:
+  tier="local"  → always Ollama (free, good enough for simple tasks)
+  tier="fast"   → Anthropic Claude if available (faster, better reasoning),
+                   falls back to Ollama if no API key
+"""
 
 from __future__ import annotations
 
@@ -16,11 +22,13 @@ import yaml
 
 OLLAMA_BASE = "http://localhost:11434"
 
-_backend: str | None = None  # "ollama", "anthropic", or "dry_run"
+_init_done = False
+_ollama_ok = False
+_anthropic_ok = False
 _anthropic_client = None
 
 
-def _ollama_available() -> bool:
+def _check_ollama() -> bool:
     try:
         req = urllib.request.Request(f"{OLLAMA_BASE}/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=3):
@@ -29,9 +37,32 @@ def _ollama_available() -> bool:
         return False
 
 
-def _anthropic_available() -> bool:
+def _check_anthropic() -> bool:
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     return bool(key and key.strip())
+
+
+def _init_backends():
+    """One-time init: load .env, probe both backends."""
+    global _init_done, _ollama_ok, _anthropic_ok
+    if _init_done:
+        return
+    _init_done = True
+
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
+
+    _ollama_ok = _check_ollama()
+    _anthropic_ok = _check_anthropic()
+
+    backends = []
+    if _ollama_ok:
+        backends.append("Ollama (local)")
+    if _anthropic_ok:
+        backends.append("Anthropic (cloud — for heavy steps)")
+    if not backends:
+        backends.append("DRY-RUN (no backends available)")
+    print(f"  [utils] Backends: {' + '.join(backends)}")
 
 
 def _get_anthropic_client():
@@ -42,48 +73,22 @@ def _get_anthropic_client():
     return _anthropic_client
 
 
-def _detect_backend() -> str:
-    """Auto-detect which LLM backend to use. Priority: Ollama > Anthropic > dry-run."""
-    global _backend
-    if _backend is not None:
-        return _backend
-
-    from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
-
-    if _ollama_available():
-        _backend = "ollama"
-        print("  [utils] Backend: Ollama (local)")
-    elif _anthropic_available():
-        _backend = "anthropic"
-        print("  [utils] Backend: Anthropic Claude (cloud)")
-    else:
-        _backend = "dry_run"
-        print("  [utils] Backend: DRY-RUN (no Ollama or Anthropic key found)")
-
-    return _backend
-
-
 def load_config() -> dict[str, Any]:
     cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
     with open(cfg_path) as f:
         return yaml.safe_load(f) or {}
 
 
-# ── Ollama backend ──────────────────────────────────────────────
+# ── Ollama ──────────────────────────────────────────────────────
 
 def _ask_ollama(prompt: str, *, system: str, model: str, temperature: float) -> str:
-    full_prompt = prompt
-    if system:
-        full_prompt = f"{system}\n\n{prompt}"
-
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
     payload = json.dumps({
         "model": model,
         "prompt": full_prompt,
         "stream": False,
         "options": {"temperature": temperature},
     }).encode()
-
     req = urllib.request.Request(
         f"{OLLAMA_BASE}/api/generate",
         data=payload,
@@ -94,7 +99,7 @@ def _ask_ollama(prompt: str, *, system: str, model: str, temperature: float) -> 
     return data.get("response", "")
 
 
-# ── Anthropic backend ───────────────────────────────────────────
+# ── Anthropic ───────────────────────────────────────────────────
 
 def _ask_anthropic(prompt: str, *, system: str, model: str, temperature: float) -> str:
     client = _get_anthropic_client()
@@ -110,6 +115,37 @@ def _ask_anthropic(prompt: str, *, system: str, model: str, temperature: float) 
     return resp.content[0].text
 
 
+# ── Router ──────────────────────────────────────────────────────
+
+def _resolve_backend(tier: str) -> str:
+    """Pick backend for this call.
+
+    tier="local"  → Ollama (always, unless down → Anthropic → dry_run)
+    tier="fast"   → Anthropic if available, else Ollama, else dry_run
+    """
+    _init_backends()
+
+    if tier == "fast":
+        if _anthropic_ok:
+            return "anthropic"
+        if _ollama_ok:
+            return "ollama"
+        return "dry_run"
+    else:  # "local"
+        if _ollama_ok:
+            return "ollama"
+        if _anthropic_ok:
+            return "anthropic"
+        return "dry_run"
+
+
+def _get_model(backend: str) -> str:
+    cfg = load_config().get("pipeline", {})
+    if backend == "anthropic":
+        return cfg.get("anthropic_model", "claude-sonnet-4-20250514")
+    return cfg.get("ollama_model", "llama3.1:8b")
+
+
 # ── Public API ──────────────────────────────────────────────────
 
 def ask_llm(
@@ -118,30 +154,26 @@ def ask_llm(
     system: str = "",
     model: str | None = None,
     temperature: float = 0.3,
+    tier: str = "local",
     dry_run_response: str = "",
 ) -> str:
-    """Send a prompt to the best available LLM and return text.
+    """Send a prompt to an LLM.
 
-    Auto-detection order: Ollama (local) → Anthropic (cloud) → dry-run stub.
+    tier="local"  → Ollama handles it (free, for lightweight tasks)
+    tier="fast"   → Anthropic Claude if key is set (for heavy/slow steps)
     """
-    backend = _detect_backend()
+    backend = _resolve_backend(tier)
 
     if backend == "dry_run":
         return dry_run_response or '{"stub": true}'
 
-    cfg = load_config()
-    pipeline_cfg = cfg.get("pipeline", {})
+    resolved_model = model or _get_model(backend)
 
-    if backend == "ollama":
-        resolved_model = model or pipeline_cfg.get("ollama_model",
-                                                    pipeline_cfg.get("model", "llama3.1:8b"))
-        return _ask_ollama(prompt, system=system, model=resolved_model,
-                           temperature=temperature)
-
-    # anthropic
-    resolved_model = model or pipeline_cfg.get("anthropic_model", "claude-sonnet-4-20250514")
-    return _ask_anthropic(prompt, system=system, model=resolved_model,
-                          temperature=temperature)
+    if backend == "anthropic":
+        return _ask_anthropic(prompt, system=system, model=resolved_model,
+                              temperature=temperature)
+    return _ask_ollama(prompt, system=system, model=resolved_model,
+                       temperature=temperature)
 
 
 def ask_llm_json(
@@ -149,10 +181,14 @@ def ask_llm_json(
     *,
     system: str = "",
     model: str | None = None,
+    tier: str = "local",
     dry_run_response: dict | list | None = None,
 ) -> Any:
-    """Send a prompt requesting JSON output, parse and return."""
-    backend = _detect_backend()
+    """Send a prompt requesting JSON, parse and return.
+
+    tier="local" / tier="fast" — same routing as ask_llm.
+    """
+    backend = _resolve_backend(tier)
 
     if backend == "dry_run":
         return dry_run_response if dry_run_response is not None else {"stub": True}
@@ -162,10 +198,10 @@ def ask_llm_json(
         system=(system + "\nRespond ONLY with valid JSON. No markdown fences, "
                 "no explanation, no text before or after the JSON."),
         model=model,
+        tier=tier,
     )
 
     cleaned = raw.strip()
-    # Strip markdown fences
     if cleaned.startswith("```"):
         first_newline = cleaned.find("\n")
         if first_newline > 0:
@@ -174,7 +210,6 @@ def ask_llm_json(
             cleaned = cleaned[: cleaned.rfind("```")]
         cleaned = cleaned.strip()
 
-    # Find JSON start
     start = -1
     for i, ch in enumerate(cleaned):
         if ch in ("{", "["):
