@@ -26,7 +26,7 @@ def _run_ml_prediction(df_latest: dict, last_20: list[dict], cfg: dict) -> dict[
         return {"signal": "HOLD", "confidence": 0.5, "importances": {}}
 
     X = df[available].fillna(0)
-    close = df.get("Close")
+    close = df["Close"] if "Close" in df.columns else None
     if close is None or len(close) < 2:
         return {"signal": "HOLD", "confidence": 0.5, "importances": {}}
 
@@ -72,6 +72,22 @@ def analyze_one_ticker(ticker: str, ticker_data: dict, cfg: dict) -> dict[str, A
         val = latest.get(key)
         if val is not None:
             indicators_lines.append(f"  {key}: {val:.4f}" if isinstance(val, float) else f"  {key}: {val}")
+
+    cdl_bits = []
+    for key, label in [
+        ("cdl_doji", "cdl_doji"),
+        ("cdl_hammer", "cdl_hammer"),
+        ("cdl_inverted_hammer", "cdl_inverted_hammer"),
+        ("cdl_bullish_engulfing", "cdl_bullish_engulfing"),
+        ("cdl_bearish_engulfing", "cdl_bearish_engulfing"),
+    ]:
+        if key in latest and latest.get(key) is not None:
+            cdl_bits.append(f"{label}={int(latest[key])}")
+    for key in ("cdl_hammer_5d", "cdl_doji_5d"):
+        if key in latest and latest.get(key) is not None:
+            cdl_bits.append(f"{key}={int(latest[key])}")
+    if cdl_bits:
+        indicators_lines.append("  Candlestick (see CANDLESTICK_PATTERNS.md): " + ", ".join(cdl_bits))
 
     price_lines = []
     for bar in last_20[-10:]:

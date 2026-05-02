@@ -37,7 +37,7 @@ def _collect_one(ticker: str, lookback_days: int) -> dict[str, Any] | None:
         df = add_features(df, vix)
 
         last_20 = df.tail(20).copy()
-        last_20.index = last_20.index.strftime("%Y-%m-%d")
+        last_20["date"] = last_20.index.strftime("%Y-%m-%d")
         return {
             "ticker": ticker,
             "rows": len(df),

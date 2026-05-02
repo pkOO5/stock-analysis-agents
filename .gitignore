@@ -17,3 +17,5 @@ data/*.log
 data/*.txt
 # Paper trades log is tracked (useful to review history)
 # data/paper_trades.jsonl
+
+ml_soak_test.log

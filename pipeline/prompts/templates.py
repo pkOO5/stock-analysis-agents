@@ -48,18 +48,21 @@ Return JSON: {{"ticker": "{ticker}", "signal": "BUY|SELL|HOLD", \
 
 PATTERN_SYSTEM = (
     "You are a candlestick and price-action specialist. You identify actionable "
-    "chart patterns from OHLC data. Focus on the last 5-10 bars."
+    "chart patterns from OHLC data. Focus on the last 5-10 bars. The Cdl column "
+    "uses algorithmic flags from CANDLESTICK_PATTERNS.md: D=doji, H=hammer, "
+    "I=inverted hammer, B=bullish engulfing, E=bearish engulfing."
 )
 
 PATTERN_PROMPT = """\
 Ticker: {ticker}
 
-Last 20 bars (OHLC + pattern flags):
+Last 20 bars (OHLCV + Cdl flags per bar):
 {bars}
 
-Candlestick flags on latest bar:
-  doji={doji}, hammer={hammer}, inv_hammer={inv_hammer}, \
+Latest bar candlestick bits (0/1): doji={doji}, hammer={hammer}, inv_hammer={inv_hammer}, \
 bull_engulf={bull_engulf}, bear_engulf={bear_engulf}
+
+Rolling 5-session counts (density): hammer_5d={hammer_5d}, doji_5d={doji_5d}
 
 Identify the dominant pattern(s), trend direction, and any notable \
 support/resistance levels.
@@ -72,7 +75,9 @@ Return JSON: {{"ticker": "{ticker}", "trend": "bullish|bearish|neutral", \
 DECISION_SYSTEM = (
     "You are a portfolio manager making BUY/SELL/HOLD decisions. You weigh "
     "technical analysis, pattern signals, and market regime. Risk management "
-    "is paramount: limit total actionable positions."
+    "is paramount: limit total actionable positions. When the ML technical "
+    "bias and pattern trend agree, you may increase conviction slightly; when "
+    "they clearly conflict, prefer HOLD or require stronger institutional confirmation."
 )
 
 DECISION_PROMPT = """\

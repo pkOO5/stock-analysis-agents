@@ -108,7 +108,9 @@ stock-analysis-agents/
 │       └── templates.py      # LLM prompt templates
 ├── market_fetcher.py         # OHLCV data (Polygon → Finnhub → yfinance)
 ├── feature_engineering.py    # RSI, MACD, Bollinger, candlestick patterns
+├── CANDLESTICK_PATTERNS.md   # Candle definitions + how ML/paper trading uses them
 ├── constants.py              # Feature columns, model factory
+├── live_ml_signal.py         # Fetch latest data → ML+candle signal (quick live check)
 ├── backtest.py               # Walk-forward ML backtest
 ├── simulate_portfolio.py     # Dollar-amount portfolio simulation
 ├── paper_trader.py           # Paper trade logger + outcome reviewer
@@ -147,6 +149,29 @@ Based on research from [Quantum Algo](https://www.quantum-algo.com/blog/algorith
 4. **Smart money alignment** — Our institutional tracker checks if insiders and big funds agree with the ML signal. Trades where insiders are buying into a BUY signal have historically higher conviction.
 5. **VIX regime awareness** — The decision agent already adjusts for high VIX (be conservative when fear is elevated).
 6. **Never trust a single indicator** — That's why we have 7 agents, not 1.
+
+## Live / latest-bar ML check
+
+Run the **same** classifier as the technical agent on freshly fetched daily data
+(no full LangGraph run; no LLM required):
+
+```bash
+python live_ml_signal.py
+python live_ml_signal.py --tickers SPY NVDA AAPL
+python live_ml_signal.py --model xgboost --min-train-rows 120
+
+# Same fetch, plus walk-forward P/L, risk, weekday + candlestick pattern tables
+python live_ml_signal.py --tickers SPY --report
+python live_ml_signal.py --report --report-train-window 252 --threshold 0.55
+```
+
+Uses `market_fetcher` (Polygon → Finnhub → yfinance). The printed **as_of** date
+is the latest bar in the feed; the signal is **P(next daily close > that close)**.
+
+`--report` uses `backtest.walk_forward_backtest` on that history: win rate, total
+return, profit factor, avg win vs avg loss, cumulative max drawdown, max losing
+streak, and breakdowns by **weekday of the signal bar** (Mon–Fri; daily data has
+no intraday time-of-day) and by **candlestick tag** on the signal bar.
 
 ## Backtesting
 

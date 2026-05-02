@@ -13,16 +13,34 @@ from pipeline.prompts.templates import PATTERN_PROMPT, PATTERN_SYSTEM
 from pipeline.utils import ask_llm_json, timed
 
 
+def _pattern_abbrev(bar: dict) -> str:
+    """Compact candle flags: D=doji H=hammer I=inverted B=bull engulf E=bear engulf."""
+    parts = []
+    if int(bar.get("cdl_doji", 0) or 0):
+        parts.append("D")
+    if int(bar.get("cdl_hammer", 0) or 0):
+        parts.append("H")
+    if int(bar.get("cdl_inverted_hammer", 0) or 0):
+        parts.append("I")
+    if int(bar.get("cdl_bullish_engulfing", 0) or 0):
+        parts.append("B")
+    if int(bar.get("cdl_bearish_engulfing", 0) or 0):
+        parts.append("E")
+    return "".join(parts) or "-"
+
+
 def _format_bars(last_20: list[dict]) -> str:
-    """Format last 20 bars as a readable table."""
-    lines = ["Date        | Open     | High     | Low      | Close    | Volume"]
-    lines.append("-" * 72)
+    """Format last 20 bars as OHLCV + algorithmic candlestick flags (see CANDLESTICK_PATTERNS.md)."""
+    lines = [
+        "Date       | Open     | High     | Low      | Close    | Volume   | Cdl",
+        "-" * 85,
+    ]
     for bar in last_20:
         lines.append(
-            f"{bar.get('date', '?'):11s} | "
+            f"{str(bar.get('date', '?')):10s} | "
             f"{bar.get('Open', 0):8.2f} | {bar.get('High', 0):8.2f} | "
             f"{bar.get('Low', 0):8.2f} | {bar.get('Close', 0):8.2f} | "
-            f"{bar.get('Volume', 0):>10.0f}"
+            f"{bar.get('Volume', 0):8.0f} | {_pattern_abbrev(bar)}"
         )
     return "\n".join(lines)
 
@@ -42,6 +60,8 @@ def analyze_patterns(ticker: str, ticker_data: dict) -> dict[str, Any]:
         inv_hammer=int(latest.get("cdl_inverted_hammer", 0)),
         bull_engulf=int(latest.get("cdl_bullish_engulfing", 0)),
         bear_engulf=int(latest.get("cdl_bearish_engulfing", 0)),
+        hammer_5d=int(latest.get("cdl_hammer_5d", 0)),
+        doji_5d=int(latest.get("cdl_doji_5d", 0)),
     )
 
     fallback = {

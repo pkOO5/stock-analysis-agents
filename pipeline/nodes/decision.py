@@ -13,6 +13,25 @@ from pipeline.prompts.templates import DECISION_PROMPT, DECISION_SYSTEM
 from pipeline.utils import ask_llm_json, load_config, timed
 
 
+def _confluence_adjusted_confidence(
+    signal: str, base_conf: float, pattern_block: dict
+) -> float:
+    """Slight nudge when pattern trend agrees with ML signal (fallback / ranking)."""
+    trend = (pattern_block.get("trend") or "neutral").lower()
+    nudge = 0.04
+    if signal == "BUY":
+        if trend == "bullish":
+            return min(1.0, base_conf + nudge)
+        if trend == "bearish":
+            return max(0.0, base_conf - nudge)
+    if signal == "SELL":
+        if trend == "bearish":
+            return min(1.0, base_conf + nudge)
+        if trend == "bullish":
+            return max(0.0, base_conf - nudge)
+    return base_conf
+
+
 def _format_analyses(technical: dict, patterns: dict, institutional: dict) -> str:
     """Build a per-ticker summary block for the decision prompt."""
     tickers = set(list(technical.keys()) + list(patterns.keys()))
@@ -64,11 +83,15 @@ def run_decision(state: dict[str, Any]) -> dict[str, Any]:
     fallback_decisions = []
     for t, tech in technical.items():
         sig = tech.get("signal", "HOLD")
-        conf = tech.get("adjusted_confidence", tech.get("ml_confidence", 0.5))
-        action = sig if sig in ("BUY", "SELL") and conf >= 0.55 else "HOLD"
+        conf = float(tech.get("adjusted_confidence", tech.get("ml_confidence", 0.5)))
+        pat = patterns.get(t, {})
+        eff = _confluence_adjusted_confidence(sig, conf, pat)
+        action = sig if sig in ("BUY", "SELL") and eff >= 0.55 else "HOLD"
+        reason = "Dry-run: ML signal with pattern-trend confluence nudge." if eff != conf else "Dry-run: based on raw ML signal."
         fallback_decisions.append({
             "ticker": t, "action": action,
-            "confidence": conf, "reasoning": "Dry-run: based on raw ML signal.",
+            "confidence": eff,
+            "reasoning": reason,
         })
     actionable_count = sum(1 for d in fallback_decisions if d["action"] in ("BUY", "SELL"))
     if actionable_count > max_positions:
